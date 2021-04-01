@@ -4,6 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
+import os 
+import pprint
+pp = pprint.PrettyPrinter(indent=1)
+
 
 def nothing(x):
     pass
@@ -12,11 +16,11 @@ def nothing(x):
 
 # settings
 cv2.namedWindow("settings")
-cv2.createTrackbar("amplification", "settings", 1000, 10000, nothing)
-cv2.createTrackbar("divider",       "settings", 10,   100,   nothing)
+cv2.createTrackbar("amplification", "settings", 250, 10000, nothing)
+cv2.createTrackbar("divider",       "settings", 1,   100,   nothing)
 cv2.createTrackbar("shift",         "settings", 0,    1,     nothing)
-cv2.createTrackbar("half",          "settings", 0,    1,     nothing)
-
+# cv2.createTrackbar("half",          "settings", 0,    1,     nothing)
+cv2.createTrackbar("save",          "settings", 0,    1,     nothing)
 
 
 rainbow = cv2.imread("rainbow.jpg")
@@ -25,22 +29,10 @@ thickness = 4
 forgetting_factor    = 0.9
 amplification_factor = 1.1
 
-# amplification     = 1000
-# divider           = 10
-
-# shift = True
-# half  = False
-
-# if half:
-#     data_fft_abs_values = np.zeros(N//2)
-# else:
-
 
 def color_styles(key, height, width):
     if key == "rainbow":
         return rainbow
-
-# color_styles(key="rainbow")
 
 
 def plot_bars(black, data_fft_abs, thickness, settings_dict, key="rainbow"):
@@ -79,17 +71,23 @@ def get_setting_dictionary():
     amplification = cv2.getTrackbarPos("amplification", "settings")
     divider       = cv2.getTrackbarPos("divider", "settings")
     shift_        = cv2.getTrackbarPos("shift", "settings")
-    half_         = cv2.getTrackbarPos("half", "settings")
+    # half_         = cv2.getTrackbarPos("half", "settings")
+    save_         = cv2.getTrackbarPos("save", "settings")
 
     if shift_ == 0:
         shift = False
     else:
         shift = True
 
-    if half_ == 0:
-        half = False
+    # if half_ == 0:
+    #     half = False
+    # else:
+    #     half = True
+
+    if save_ == 0:
+        save = False
     else:
-        half = True
+        save = True
     
     if divider == 0:
         divider = 1
@@ -97,7 +95,8 @@ def get_setting_dictionary():
     settings_dict["amplification"] = amplification
     settings_dict["divider"] = divider
     settings_dict["shift"] = shift
-    settings_dict["half"] = half
+    # settings_dict["half"] = half
+    settings_dict["save"] = save
 
     return settings_dict
 
@@ -114,8 +113,8 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
     if settings_dict["shift"]:
         data_fft = np.fft.fftshift(data_fft)
     
-    if settings_dict["half"]:
-        data_fft = data_fft[:N//2]
+    # if settings_dict["half"]:
+    #     data_fft = data_fft[:N//2]
 
     data_fft_abs = abs(data_fft)
 
@@ -132,24 +131,60 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
 
 
 def realtime_spectrum(path_config):
-    CHUNK = N
-    FORMAT = pyaudio.paInt16
-    CHANNELS = 1
-    RATE = 11025
-    RECORD_SECONDS = 5
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    
+    CHUNK          = N
+    FORMAT         = pyaudio.paInt16
 
-    WAVE_OUTPUT_FILENAME = "output.wav"
+    # Find device:
+    
+
+    # Mix Stereo
+
+    # {'defaultHighInputLatency': 0.18,
+    #  'defaultHighOutputLatency': 0.18,
+    #  'defaultLowInputLatency': 0.09,
+    #  'defaultLowOutputLatency': 0.09,
+    #  'defaultSampleRate': 44100.0,
+    #  'hostApi': 0,
+    #  'index': 0,
+    #  'maxInputChannels': 2,
+    #  'maxOutputChannels': 0,
+    #  'name': 'Microsoft Sound Mapper - Input',
+    #  'structVersion': 2}
+
+    # CHANNELS           = 1                                          
+    # input_device_index = 0
+
+    # Microphone
+    # CHANNELS           = 1                                 
+    # input_device_index = 1
+
+    RATE           = 11025
+    RECORD_SECONDS = 60
 
     p = pyaudio.PyAudio()
+
+    # Speakers              # only stereo mix need to be enabled
+    # Microphone            # only USB microphone need to be enabled
+    dev_name = 'Microsoft Sound Mapper - Input'
+    for i in range(p.get_device_count()):
+        if p.get_device_info_by_index(i)["name"] == dev_name:
+            CHANNELS           = p.get_device_info_by_index(i)["maxInputChannels"]
+            input_device_index = p.get_device_info_by_index(i)["index"]
+            break
+
+    pp.pprint(p.get_device_info_by_index(i))
+
 
     stream = p.open(format = FORMAT,
                     channels = CHANNELS,
                     rate = RATE,
                     input = True,
-                    input_device_index = 1, # 0 microphone
-                    frames_per_buffer = CHUNK)
+                    input_device_index = input_device_index, # 0 microphone
+                    frames_per_buffer = CHUNK,
+                    )
 
-    print("* recording")
 
     frames = []
 
@@ -165,6 +200,8 @@ def realtime_spectrum(path_config):
         shift_old = True
 
     data_fft_abs_values = np.zeros(N)
+
+    saved = 0
 
     while True:
         # Get data from microphone
@@ -183,6 +220,26 @@ def realtime_spectrum(path_config):
         if visualization(data_fft_abs_values, CHUNK*thickness, thickness=thickness, settings_dict=settings_dict):
             break
         
+        # Save audio
+        if settings_dict["save"]:
+            frames.append(data)
+
+            if len(frames) > RATE*RECORD_SECONDS/CHUNK:
+                WAVE_OUTPUT_FILENAME = dir_path+"/saved/output_"+str(saved)+".wav"
+                wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+                wf.setnchannels(CHANNELS)
+                wf.setsampwidth(p.get_sample_size(FORMAT))
+                wf.setframerate(RATE)
+                wf.writeframes(b''.join(frames))
+                wf.close()
+                
+                print("Saved:", WAVE_OUTPUT_FILENAME)
+
+                frames = []
+                saved += 1
+
+        else:
+            frames = []
     
         # frames.append(data)
 
@@ -193,13 +250,13 @@ def realtime_spectrum(path_config):
     stream.close()
     p.terminate()
 
-    # # Save to file
-    wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(p.get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(b''.join(frames))
-    wf.close()
+    # # # Save to file
+    # wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+    # wf.setnchannels(CHANNELS)
+    # wf.setsampwidth(p.get_sample_size(FORMAT))
+    # wf.setframerate(RATE)
+    # wf.writeframes(b''.join(frames))
+    # wf.close()
 
 
 if __name__ == "__main__":
