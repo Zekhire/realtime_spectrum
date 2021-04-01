@@ -56,11 +56,11 @@ def plot_bars(black, data_fft_abs, thickness, settings_dict):
             image_style = color_styles("rainbow", h, w)
             color       = np.squeeze(rainbow[0, i*thickness])
         elif settings_dict["mode"] == 1:
-            color       = (255, 0, 0)
+            color       = (0, 0, 255)
         elif settings_dict["mode"] == 2:
             color       = (0, 255, 0)
         elif settings_dict["mode"] == 3:
-            color       = (0, 0, 255)
+            color       = (255, 0, 0)
 
         black = cv2.rectangle(black, start_point, end_point, (int(color[0]), int(color[1]), int(color[2])) , -1)
         black = cv2.rectangle(black, start_point, end_point, (0,0,0) , 1)
