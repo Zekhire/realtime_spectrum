@@ -15,12 +15,15 @@ def nothing(x):
 
 
 # settings
-cv2.namedWindow("settings")
-cv2.createTrackbar("amplification", "settings", 250, 10000, nothing)
-cv2.createTrackbar("divider",       "settings", 1,   100,   nothing)
-cv2.createTrackbar("shift",         "settings", 0,    1,     nothing)
-# cv2.createTrackbar("half",          "settings", 0,    1,     nothing)
-cv2.createTrackbar("save",          "settings", 0,    1,     nothing)
+window_name = "settings"
+cv2.namedWindow(window_name,)
+
+cv2.createTrackbar("amplification", window_name, 250, 5000, nothing)
+cv2.createTrackbar("divider",       window_name, 1,   100,   nothing)
+cv2.createTrackbar("shift",         window_name, 0,    1,     nothing)
+# cv2.createTrackbar("half",          window_name, 0,    1,     nothing)
+cv2.createTrackbar("mode",          window_name, 0,    3,     nothing)
+cv2.createTrackbar("save",          window_name, 0,    1,     nothing)
 
 
 rainbow = cv2.imread("rainbow.jpg")
@@ -35,7 +38,7 @@ def color_styles(key, height, width):
         return rainbow
 
 
-def plot_bars(black, data_fft_abs, thickness, settings_dict, key="rainbow"):
+def plot_bars(black, data_fft_abs, thickness, settings_dict):
     h, w, _ = black.shape
 
     for i in range(len(data_fft_abs)):
@@ -45,11 +48,20 @@ def plot_bars(black, data_fft_abs, thickness, settings_dict, key="rainbow"):
             bin_height /= settings_dict["divider"]
         elif i == 0: 
             bin_height /= settings_dict["divider"]
-            
+
         start_point = (i*thickness, h-1)
         end_point   = ((i+1)*thickness, h-1-int(bin_height))
-        image_style = color_styles(key, h, w)
-        color       = np.squeeze(rainbow[0, i*thickness])
+            
+        if settings_dict["mode"] == 0:
+            image_style = color_styles("rainbow", h, w)
+            color       = np.squeeze(rainbow[0, i*thickness])
+        elif settings_dict["mode"] == 1:
+            color       = (255, 0, 0)
+        elif settings_dict["mode"] == 2:
+            color       = (0, 255, 0)
+        elif settings_dict["mode"] == 3:
+            color       = (0, 0, 255)
+
         black = cv2.rectangle(black, start_point, end_point, (int(color[0]), int(color[1]), int(color[2])) , -1)
         black = cv2.rectangle(black, start_point, end_point, (0,0,0) , 1)
     return black
@@ -72,6 +84,7 @@ def get_setting_dictionary():
     divider       = cv2.getTrackbarPos("divider", "settings")
     shift_        = cv2.getTrackbarPos("shift", "settings")
     # half_         = cv2.getTrackbarPos("half", "settings")
+    mode          = cv2.getTrackbarPos("mode", "settings")
     save_         = cv2.getTrackbarPos("save", "settings")
 
     if shift_ == 0:
@@ -96,6 +109,7 @@ def get_setting_dictionary():
     settings_dict["divider"] = divider
     settings_dict["shift"] = shift
     # settings_dict["half"] = half
+    settings_dict["mode"] = mode
     settings_dict["save"] = save
 
     return settings_dict
@@ -157,8 +171,8 @@ def realtime_spectrum(path_config):
     # input_device_index = 0
 
     # Microphone
-    # CHANNELS           = 1                                 
-    # input_device_index = 1
+    CHANNELS           = 1                                 
+    input_device_index = 1
 
     RATE           = 11025
     RECORD_SECONDS = 60
@@ -203,7 +217,7 @@ def realtime_spectrum(path_config):
 
     saved = 0
 
-    while True:
+    while cv2.getWindowProperty(window_name, 0) >= 0:
         # Get data from microphone
         data = stream.read(CHUNK)
 
@@ -242,8 +256,6 @@ def realtime_spectrum(path_config):
             frames = []
     
         # frames.append(data)
-
-    print("* done recording")
     
     # Stop stream
     stream.stop_stream()
