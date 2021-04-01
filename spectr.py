@@ -13,9 +13,9 @@ def nothing(x):
 # settings
 cv2.namedWindow("settings")
 cv2.createTrackbar("amplification", "settings", 1000, 10000, nothing)
-cv2.createTrackbar("divider", "settings", 10, 100, nothing)
-cv2.createTrackbar("shift", "settings", 0, 1, nothing)
-cv2.createTrackbar("half", "settings", 0, 1, nothing)
+cv2.createTrackbar("divider",       "settings", 10,   100,   nothing)
+cv2.createTrackbar("shift",         "settings", 0,    1,     nothing)
+cv2.createTrackbar("half",          "settings", 0,    1,     nothing)
 
 
 
@@ -34,7 +34,6 @@ amplification_factor = 1.1
 # if half:
 #     data_fft_abs_values = np.zeros(N//2)
 # else:
-data_fft_abs_values = np.zeros(N)
 
 
 def color_styles(key, height, width):
@@ -44,18 +43,17 @@ def color_styles(key, height, width):
 # color_styles(key="rainbow")
 
 
-def plot_bars(black, data_fft_abs, thickness, shift, amplification, divider, key="rainbow"):
+def plot_bars(black, data_fft_abs, thickness, settings_dict, key="rainbow"):
     h, w, _ = black.shape
 
     for i in range(len(data_fft_abs)):
     
-        bin_height = data_fft_abs[i]*amplification
-        if shift and i == len(data_fft_abs)//2:
-            bin_height /= divider
+        bin_height = data_fft_abs[i]*settings_dict["amplification"]
+        if settings_dict["shift"] and i == len(data_fft_abs)//2:
+            bin_height /= settings_dict["divider"]
         elif i == 0: 
-            bin_height /= divider
+            bin_height /= settings_dict["divider"]
             
-    
         start_point = (i*thickness, h-1)
         end_point   = ((i+1)*thickness, h-1-int(bin_height))
         image_style = color_styles(key, h, w)
@@ -65,12 +63,61 @@ def plot_bars(black, data_fft_abs, thickness, shift, amplification, divider, key
     return black
 
 
-
-def visualization(data_fft, width=256*3, height=600, thickness=3, shift=True, amplification=5000, divider=1000):
+def visualization(data_fft_abs, width=256*3, height=600, thickness=3, settings_dict={}):
     black = np.zeros((height, width, 3), np.uint8)
+    black_fft = plot_bars(black, data_fft_abs, thickness, settings_dict)
+    cv2.imshow("visualization", black_fft)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        return True
+    else:
+        return False
+
+
+def get_setting_dictionary():
+    settings_dict = {}
+
+    amplification = cv2.getTrackbarPos("amplification", "settings")
+    divider       = cv2.getTrackbarPos("divider", "settings")
+    shift_        = cv2.getTrackbarPos("shift", "settings")
+    half_         = cv2.getTrackbarPos("half", "settings")
+
+    if shift_ == 0:
+        shift = False
+    else:
+        shift = True
+
+    if half_ == 0:
+        half = False
+    else:
+        half = True
+    
+    if divider == 0:
+        divider = 1
+    
+    settings_dict["amplification"] = amplification
+    settings_dict["divider"] = divider
+    settings_dict["shift"] = shift
+    settings_dict["half"] = half
+
+    return settings_dict
+
+
+
+def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old):
+    # Perform FFT
+
+    if shift_old != settings_dict["shift"]:
+        shift_old = settings_dict["shift"]
+        data_fft_abs_values = np.fft.fftshift(data_fft_abs_values)
+
+    data_fft = np.fft.fft(data_a, CHUNK)
+    if settings_dict["shift"]:
+        data_fft = np.fft.fftshift(data_fft)
+    
+    if settings_dict["half"]:
+        data_fft = data_fft[:N//2]
 
     data_fft_abs = abs(data_fft)
-    data_fft_abs
 
     for i in range(len(data_fft_abs_values)):
         if data_fft_abs_values[i]*forgetting_factor > data_fft_abs[i]:
@@ -80,14 +127,11 @@ def visualization(data_fft, width=256*3, height=600, thickness=3, shift=True, am
         else:
             data_fft_abs_values[i] = data_fft_abs[i]
 
-    # black_fft = plot_bars(black, data_fft_abs, thickness)
-    black_fft = plot_bars(black, data_fft_abs_values, thickness, shift, amplification, divider)
-    cv2.imshow("visualization", black_fft)
+    return data_fft_abs_values, shift_old
 
 
 
 def realtime_spectrum(path_config):
-
     CHUNK = N
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
@@ -98,12 +142,12 @@ def realtime_spectrum(path_config):
 
     p = pyaudio.PyAudio()
 
-    stream = p.open(format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                input=True,
-                input_device_index = 1, # 0 microphone
-                frames_per_buffer=CHUNK)
+    stream = p.open(format = FORMAT,
+                    channels = CHANNELS,
+                    rate = RATE,
+                    input = True,
+                    input_device_index = 1, # 0 microphone
+                    frames_per_buffer = CHUNK)
 
     print("* recording")
 
@@ -112,35 +156,17 @@ def realtime_spectrum(path_config):
     # Record audio
     # for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
 
-    shift_old_ = 1 - cv2.getTrackbarPos("shift", "Tracking")
+    settings_dict = get_setting_dictionary()
+    shift_old_ = 1-settings_dict["shift"]
     
     if shift_old_ == 0:
         shift_old = False
     else:
         shift_old = True
 
+    data_fft_abs_values = np.zeros(N)
+
     while True:
-
-        amplification = cv2.getTrackbarPos("amplification", "settings")
-        divider       = cv2.getTrackbarPos("divider", "settings")
-        shift_        = cv2.getTrackbarPos("shift", "settings")
-        half_         = cv2.getTrackbarPos("half", "settings")
-
-        # print(amplification)
-        # exit()
-
-        if shift_ == 0:
-            shift = False
-        else:
-            shift = True
-
-        if half_ == 0:
-            half = False
-        else:
-            half = True
-
-
-
         # Get data from microphone
         data = stream.read(CHUNK)
 
@@ -148,21 +174,16 @@ def realtime_spectrum(path_config):
         data_a = np.frombuffer((data), dtype=np.int16)
         data_a = data_a.astype('float_')/(2**15)
 
-        # Perform FFT
-        data_fft = np.fft.fft(data_a, CHUNK)
-        if shift:
-            data_fft = np.fft.fftshift(data_fft)
-        
-        if half:
-            data_fft = data_fft[:N//2]
+        settings_dict = get_setting_dictionary()
 
-        visualization(data_fft, CHUNK*thickness, thickness=thickness, shift=shift, amplification=amplification, divider=divider)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        # FFT processing
+        data_fft_abs_values, shift_old = fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
+
+        # FFT visualization
+        if visualization(data_fft_abs_values, CHUNK*thickness, thickness=thickness, settings_dict=settings_dict):
             break
-        # print(data_a)
-        # print(np.abs(data_fft))
-        # print(max((data_a)/(2**15)), len(data_a), type(data_a[0]))
-        # print(max(data), len(data_a))
+        
+    
         # frames.append(data)
 
     print("* done recording")
