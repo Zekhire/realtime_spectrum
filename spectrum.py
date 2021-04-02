@@ -17,7 +17,7 @@ def nothing(x):
 window_name = "settings"
 cv2.namedWindow(window_name,)
 
-cv2.createTrackbar("amplification", window_name, 250, 5000, nothing)
+cv2.createTrackbar("magnitude", window_name, 250, 5000, nothing)
 cv2.createTrackbar("divider",       window_name, 1,   100,   nothing)
 cv2.createTrackbar("shift",         window_name, 0,    1,     nothing)
 # cv2.createTrackbar("half",          window_name, 0,    1,     nothing)
@@ -29,7 +29,7 @@ rainbow = cv2.imread("rainbow.jpg")
 N = 256
 thickness = 4
 forgetting_factor    = 0.9
-amplification_factor = 1.1
+magnitude_factor = 1.1
 
 
 def color_styles(key, height, width):
@@ -42,7 +42,7 @@ def plot_bars(black, data_fft_abs, thickness, settings_dict):
 
     for i in range(len(data_fft_abs)):
     
-        bin_height = data_fft_abs[i]*settings_dict["amplification"]
+        bin_height = data_fft_abs[i]*settings_dict["magnitude"]
         if settings_dict["shift"] and i == len(data_fft_abs)//2:
             bin_height /= settings_dict["divider"]
         elif i == 0: 
@@ -79,7 +79,7 @@ def visualization(data_fft_abs, width=256*3, height=600, thickness=3, settings_d
 def get_setting_dictionary():
     settings_dict = {}
 
-    amplification = cv2.getTrackbarPos("amplification", "settings")
+    magnitude = cv2.getTrackbarPos("magnitude", "settings")
     divider       = cv2.getTrackbarPos("divider", "settings")
     shift_        = cv2.getTrackbarPos("shift", "settings")
     # half_         = cv2.getTrackbarPos("half", "settings")
@@ -104,7 +104,7 @@ def get_setting_dictionary():
     if divider == 0:
         divider = 1
     
-    settings_dict["amplification"] = amplification
+    settings_dict["magnitude"] = magnitude
     settings_dict["divider"] = divider
     settings_dict["shift"] = shift
     # settings_dict["half"] = half
@@ -134,8 +134,8 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
     for i in range(len(data_fft_abs_values)):
         if data_fft_abs_values[i]*forgetting_factor > data_fft_abs[i]:
             data_fft_abs_values[i] *= forgetting_factor
-        elif data_fft_abs_values[i]*amplification_factor < data_fft_abs[i] and data_fft_abs_values[i] > 0.2:
-            data_fft_abs_values[i] *= amplification_factor
+        elif data_fft_abs_values[i]*magnitude_factor < data_fft_abs[i] and data_fft_abs_values[i] > 0.2:
+            data_fft_abs_values[i] *= magnitude_factor
         else:
             data_fft_abs_values[i] = data_fft_abs[i]
 
@@ -170,8 +170,8 @@ def realtime_spectrum(path_config):
     # input_device_index = 0
 
     # Microphone
-    CHANNELS           = 1                                 
-    input_device_index = 1
+    # CHANNELS           = 1                                 
+    # input_device_index = 1
 
     RATE           = 11025
     RECORD_SECONDS = 60
