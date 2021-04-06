@@ -50,6 +50,11 @@ def plot_bars(black, data_fft_abs, thickness, settings_dict):
         # data_fft_abs_values[i] *= settings_dict["magnitude"]
         bin_height = data_fft_abs[i]*settings_dict["magnitude"]
 
+        if settings_dict["shift"] and i == len(data_fft_abs)//2:
+            bin_height /= settings_dict["divider"]
+        elif settings_dict["shift"] is False and i == 0: 
+            bin_height /= settings_dict["divider"]
+
         start_point = (i*thickness, h-1)
         end_point   = ((i+1)*thickness, h-1-int(bin_height))
             
@@ -147,15 +152,12 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
     for i in range(len(data_fft_abs_values)):
         if data_fft_abs_values[i]*settings_dict["forgetting_factor"] > data_fft_abs[i]:
             data_fft_abs_values[i] *= settings_dict["forgetting_factor"]
-        elif data_fft_abs_values[i]*settings_dict["magnitude_factor"] < data_fft_abs[i] and data_fft_abs_values[i] > 0.02:
+        elif data_fft_abs_values[i]*settings_dict["magnitude_factor"] < data_fft_abs[i] and data_fft_abs_values[i] < 0.02:
+            data_fft_abs_values[i] = 0.02
+        elif data_fft_abs_values[i]*settings_dict["magnitude_factor"] < data_fft_abs[i]:
             data_fft_abs_values[i] *= settings_dict["magnitude_factor"]
         else:
             data_fft_abs_values[i] = data_fft_abs[i]
-
-    if settings_dict["shift"]:
-        data_fft_abs_values[len(data_fft_abs_values)//2] /= settings_dict["divider"]
-    else: 
-        data_fft_abs_values[0] /= settings_dict["divider"]
 
     return data_fft_abs_values, shift_old
 
