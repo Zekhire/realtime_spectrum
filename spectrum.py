@@ -17,20 +17,24 @@ def nothing(x):
 window_name = "settings"
 cv2.namedWindow(window_name, cv2.WINDOW_GUI_EXPANDED)
 
-cv2.createTrackbar("magnitude", window_name, 250, 2500, nothing)
-cv2.createTrackbar("divider",   window_name, 1,   100,  nothing)
-cv2.createTrackbar("shift",     window_name, 0,    1,   nothing)
-# cv2.createTrackbar("half",          window_name, 0,    1,     nothing)
-cv2.createTrackbar("mode",      window_name, 0,    3,   nothing)
-cv2.createTrackbar("save",      window_name, 0,    1,   nothing)
+cv2.createTrackbar("magnitude",         window_name, 250, 2500, nothing)
+cv2.createTrackbar("divider",           window_name, 1,   100,  nothing)
+cv2.createTrackbar("shift",             window_name, 0,    1,   nothing)
+# cv2.createTrackbar("half",            window_name, 0,    1,   nothing)
+cv2.createTrackbar("forgetting factor", window_name, 5,    10,  nothing)
+cv2.createTrackbar("magnitude factor",  window_name, 5,    10,  nothing)
+cv2.createTrackbar("mode",              window_name, 0,    3,   nothing)
+cv2.createTrackbar("save",              window_name, 0,    1,   nothing)
 
 
 rainbow = cv2.imread("rainbow.jpg")
-N = 256*2
-thickness = 4//2
-RATE              = 11025*2
-forgetting_factor = 0.95
-magnitude_factor  = 1.07
+fast_changer = 1
+fast_changer_fs = 1
+N         = int(256//fast_changer)
+thickness = int(4*fast_changer)
+RATE      = int(11025*fast_changer_fs/fast_changer)
+# forgetting_factor = 0.95
+# magnitude_factor  = 1.07
 
 
 def color_styles(key, height, width):
@@ -43,11 +47,8 @@ def plot_bars(black, data_fft_abs, thickness, settings_dict):
 
     for i in range(len(data_fft_abs)):
     
+        # data_fft_abs_values[i] *= settings_dict["magnitude"]
         bin_height = data_fft_abs[i]*settings_dict["magnitude"]
-        if settings_dict["shift"] and i == len(data_fft_abs)//2:
-            bin_height /= settings_dict["divider"]
-        elif i == 0: 
-            bin_height /= settings_dict["divider"]
 
         start_point = (i*thickness, h-1)
         end_point   = ((i+1)*thickness, h-1-int(bin_height))
@@ -80,12 +81,14 @@ def visualization(data_fft_abs, width=256*3, height=600, thickness=3, settings_d
 def get_setting_dictionary():
     settings_dict = {}
 
-    magnitude = cv2.getTrackbarPos("magnitude", "settings")
-    divider       = cv2.getTrackbarPos("divider", "settings")
-    shift_        = cv2.getTrackbarPos("shift", "settings")
-    # half_         = cv2.getTrackbarPos("half", "settings")
-    mode          = cv2.getTrackbarPos("mode", "settings")
-    save_         = cv2.getTrackbarPos("save", "settings")
+    magnitude           = cv2.getTrackbarPos("magnitude", "settings")
+    divider             = cv2.getTrackbarPos("divider", "settings")
+    shift_              = cv2.getTrackbarPos("shift", "settings")
+    # half_             = cv2.getTrackbarPos("half", "settings")
+    forgetting_factor   = cv2.getTrackbarPos("forgetting factor", "settings")
+    magnitude_factor    = cv2.getTrackbarPos("magnitude factor", "settings")
+    mode                = cv2.getTrackbarPos("mode", "settings")
+    save_               = cv2.getTrackbarPos("save", "settings")
 
     if shift_ == 0:
         shift = False
@@ -101,7 +104,14 @@ def get_setting_dictionary():
         save = False
     else:
         save = True
-    
+
+    if forgetting_factor == 0:
+        forgetting_factor = 1
+
+    if magnitude_factor == 0:
+        magnitude_factor = 1
+
+
     if divider == 0:
         divider = 1
     
@@ -109,6 +119,8 @@ def get_setting_dictionary():
     settings_dict["divider"] = divider
     settings_dict["shift"] = shift
     # settings_dict["half"] = half
+    settings_dict["forgetting_factor"] =  1 - (forgetting_factor/100)
+    settings_dict["magnitude_factor"] = 1 + (magnitude_factor/100)
     settings_dict["mode"] = mode
     settings_dict["save"] = save
 
@@ -133,12 +145,17 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
     data_fft_abs = abs(data_fft)
 
     for i in range(len(data_fft_abs_values)):
-        if data_fft_abs_values[i]*forgetting_factor > data_fft_abs[i]:
-            data_fft_abs_values[i] *= forgetting_factor
-        elif data_fft_abs_values[i]*magnitude_factor < data_fft_abs[i] and data_fft_abs_values[i] > 0.02:
-            data_fft_abs_values[i] *= magnitude_factor
+        if data_fft_abs_values[i]*settings_dict["forgetting_factor"] > data_fft_abs[i]:
+            data_fft_abs_values[i] *= settings_dict["forgetting_factor"]
+        elif data_fft_abs_values[i]*settings_dict["magnitude_factor"] < data_fft_abs[i] and data_fft_abs_values[i] > 0.02:
+            data_fft_abs_values[i] *= settings_dict["magnitude_factor"]
         else:
             data_fft_abs_values[i] = data_fft_abs[i]
+
+    if settings_dict["shift"]:
+        data_fft_abs_values[len(data_fft_abs_values)//2] /= settings_dict["divider"]
+    else: 
+        data_fft_abs_values[0] /= settings_dict["divider"]
 
     return data_fft_abs_values, shift_old
 
