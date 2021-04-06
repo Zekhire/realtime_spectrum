@@ -15,21 +15,22 @@ def nothing(x):
 
 # settings
 window_name = "settings"
-cv2.namedWindow(window_name,)
+cv2.namedWindow(window_name, cv2.WINDOW_GUI_EXPANDED)
 
-cv2.createTrackbar("magnitude", window_name, 250, 5000, nothing)
-cv2.createTrackbar("divider",       window_name, 1,   100,   nothing)
-cv2.createTrackbar("shift",         window_name, 0,    1,     nothing)
+cv2.createTrackbar("magnitude", window_name, 250, 2500, nothing)
+cv2.createTrackbar("divider",   window_name, 1,   100,  nothing)
+cv2.createTrackbar("shift",     window_name, 0,    1,   nothing)
 # cv2.createTrackbar("half",          window_name, 0,    1,     nothing)
-cv2.createTrackbar("mode",          window_name, 0,    3,     nothing)
-cv2.createTrackbar("save",          window_name, 0,    1,     nothing)
+cv2.createTrackbar("mode",      window_name, 0,    3,   nothing)
+cv2.createTrackbar("save",      window_name, 0,    1,   nothing)
 
 
 rainbow = cv2.imread("rainbow.jpg")
-N = 256
-thickness = 4
-forgetting_factor    = 0.9
-magnitude_factor = 1.1
+N = 256*2
+thickness = 4//2
+RATE              = 11025*2
+forgetting_factor = 0.95
+magnitude_factor  = 1.07
 
 
 def color_styles(key, height, width):
@@ -134,7 +135,7 @@ def fft_processing(data_fft_abs_values, data_a, CHUNK, settings_dict, shift_old)
     for i in range(len(data_fft_abs_values)):
         if data_fft_abs_values[i]*forgetting_factor > data_fft_abs[i]:
             data_fft_abs_values[i] *= forgetting_factor
-        elif data_fft_abs_values[i]*magnitude_factor < data_fft_abs[i] and data_fft_abs_values[i] > 0.2:
+        elif data_fft_abs_values[i]*magnitude_factor < data_fft_abs[i] and data_fft_abs_values[i] > 0.02:
             data_fft_abs_values[i] *= magnitude_factor
         else:
             data_fft_abs_values[i] = data_fft_abs[i]
@@ -149,31 +150,6 @@ def realtime_spectrum(path_config):
     CHUNK          = N
     FORMAT         = pyaudio.paInt16
 
-    # Find device:
-    
-
-    # Mix Stereo
-
-    # {'defaultHighInputLatency': 0.18,
-    #  'defaultHighOutputLatency': 0.18,
-    #  'defaultLowInputLatency': 0.09,
-    #  'defaultLowOutputLatency': 0.09,
-    #  'defaultSampleRate': 44100.0,
-    #  'hostApi': 0,
-    #  'index': 0,
-    #  'maxInputChannels': 2,
-    #  'maxOutputChannels': 0,
-    #  'name': 'Microsoft Sound Mapper - Input',
-    #  'structVersion': 2}
-
-    # CHANNELS           = 1                                          
-    # input_device_index = 0
-
-    # Microphone
-    # CHANNELS           = 1                                 
-    # input_device_index = 1
-
-    RATE           = 11025
     RECORD_SECONDS = 60
 
     p = pyaudio.PyAudio()
@@ -201,9 +177,6 @@ def realtime_spectrum(path_config):
 
     frames = []
 
-    # Record audio
-    # for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-
     settings_dict = get_setting_dictionary()
     shift_old_ = 1-settings_dict["shift"]
     
@@ -223,6 +196,7 @@ def realtime_spectrum(path_config):
         # Convert data to float
         data_a = np.frombuffer((data), dtype=np.int16)
         data_a = data_a.astype('float_')/(2**15)
+        data_a = data_a[0::CHANNELS]
 
         settings_dict = get_setting_dictionary()
 
