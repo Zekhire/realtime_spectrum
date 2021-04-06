@@ -27,7 +27,7 @@ cv2.createTrackbar("mode",              window_name, 0,    3,   nothing)
 cv2.createTrackbar("save",              window_name, 0,    1,   nothing)
 
 
-rainbow = cv2.imread("rainbow.jpg")
+rainbow = cv2.imread("src/rainbow.jpg")
 fast_changer = 1
 fast_changer_fs = 1
 N         = int(256//fast_changer)
